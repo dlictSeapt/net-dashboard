@@ -1,0 +1,739 @@
+<!doctype html>
+<html lang="th">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ติดตามข้อมูลอินเทอร์เน็ต สพม.พัทลุง</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['"IBM Plex Sans Thai"', 'Tahoma', 'sans-serif'],
+          mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace']
+        },
+        colors: {
+          ink: 'var(--ink)', muted: 'var(--muted)', line: 'var(--line)',
+          paper: 'var(--paper)', panel: 'var(--panel)', brand: 'var(--brand)', brandsoft: 'var(--brand-soft)',
+          done: 'var(--done)', donesoft: 'var(--done-soft)',
+          prog: 'var(--prog)', progsoft: 'var(--prog-soft)',
+          todo: 'var(--todo)', todosoft: 'var(--todo-soft)',
+          neu: 'var(--neu)', neusoft: 'var(--neu-soft)'
+        }
+      }
+    }
+  }
+</script>
+<style>
+  /* Layout: header band with two tabs → [Status] gauge + tiles + school list · [Survey] executive summary + indicator tiles + question bars + per-school matrix */
+  [hidden] { display: none !important; }
+  :root {
+    color-scheme: light;
+    --paper: #f3f6f9;
+    --panel: #ffffff;
+    --ink: #13283a;
+    --muted: #5b6e80;
+    --line: #dde5ec;
+    --brand: #0f5c8c;
+    --brand-soft: #e3eef6;
+    --done: #12805c;  --done-soft: #def4ea;
+    --prog: #b26a00;  --prog-soft: #fdf0d6;
+    --todo: #c0352b;  --todo-soft: #fbe3e0;
+    --neu: #8597a8;   --neu-soft: #eaeff3;
+  }
+  body { background: var(--paper); color: var(--ink); font-family: "IBM Plex Sans Thai", Tahoma, sans-serif; font-size: 15px; line-height: 1.6; }
+  .wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .num { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  h1, h2, h3 { text-wrap: balance; }
+  .label { letter-spacing: .04em; }
+  :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
+  .gauge-arc { transition: stroke-dashoffset .9s cubic-bezier(.2,.8,.2,1); }
+  .bar-fill { transition: width .7s cubic-bezier(.2,.8,.2,1); }
+  @media (prefers-reduced-motion: reduce) { .gauge-arc, .bar-fill { transition: none; } }
+  .drop-active { border-color: var(--brand) !important; background: var(--brand-soft) !important; }
+  .tab[aria-selected="true"] { color: var(--brand); border-color: var(--brand); font-weight: 600; }
+</style>
+
+<header class="bg-panel border-b border-line">
+  <div class="wrap pt-5">
+    <div class="max-w-6xl mx-auto flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+      <div class="min-w-0">
+        <p class="text-sm text-brand font-semibold label">กลุ่มส่งเสริมการศึกษาทางไกล เทคโนโลยีสารสนเทศและการสื่อสาร · สพม.พัทลุง</p>
+        <h1 class="text-xl md:text-2xl font-bold leading-snug mt-1">รายงานการบันทึกข้อมูลด้านเครือข่ายอินเทอร์เน็ตในสังกัด สพฐ.</h1>
+        <p id="roundName" class="text-muted text-sm mt-1">—</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <select id="roundSelect" class="hidden h-10 rounded-lg border border-line bg-panel px-3 text-sm" aria-label="เลือกรอบบันทึกข้อมูล"></select>
+        <label for="fileInput" class="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg bg-brand px-4 text-sm font-semibold text-white hover:opacity-90">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"/><path d="m6 10 6-6 6 6"/><path d="M4 20h16"/></svg>
+          อัปโหลดไฟล์ Excel
+        </label>
+        <input id="fileInput" type="file" accept=".xlsx,.xls" class="sr-only">
+      </div>
+    </div>
+    <nav class="max-w-6xl mx-auto mt-4 flex gap-6 text-sm" role="tablist" aria-label="มุมมอง">
+      <button type="button" class="tab border-b-2 border-transparent pb-3 text-muted hover:text-ink" data-tab="status" role="tab" id="tab-status">ติดตามการบันทึกข้อมูล</button>
+      <button type="button" class="tab border-b-2 border-transparent pb-3 text-muted hover:text-ink" data-tab="survey" role="tab" id="tab-survey">สรุปความต้องการอินเทอร์เน็ต</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap py-6">
+  <div class="max-w-6xl mx-auto flex flex-col gap-6">
+    <div id="notice" hidden class="rounded-lg border px-4 py-3 text-sm"></div>
+
+    <!-- ===================== STATUS VIEW ===================== -->
+    <div id="view-status" class="flex flex-col gap-6">
+      <section class="grid gap-6 lg:grid-cols-5" aria-label="ภาพรวม">
+        <div class="lg:col-span-2 rounded-2xl border border-line bg-panel p-6 flex flex-col items-center">
+          <h2 class="self-start text-base font-semibold">ความก้าวหน้ารวมทั้งเขตพื้นที่</h2>
+          <p class="self-start text-sm text-muted">100% = ทุกโรงเรียนดำเนินการครบถ้วน (เขตอนุมัติแล้ว)</p>
+          <div class="relative w-full max-w-[320px] mt-4">
+            <svg viewBox="0 0 220 130" class="w-full" role="img" aria-labelledby="gaugeText">
+              <path d="M20 115 A90 90 0 0 1 200 115" fill="none" stroke="var(--line)" stroke-width="18" stroke-linecap="round"/>
+              <path id="gaugeArc" class="gauge-arc" d="M20 115 A90 90 0 0 1 200 115" fill="none" stroke="var(--brand)" stroke-width="18" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/>
+              <text x="20" y="128" text-anchor="middle" font-size="9" fill="var(--muted)" class="num">0</text>
+              <text x="200" y="128" text-anchor="middle" font-size="9" fill="var(--muted)" class="num">100</text>
+            </svg>
+            <div class="absolute inset-x-0 bottom-3 text-center">
+              <div id="gaugeText" class="num text-5xl font-semibold text-ink leading-none">0%</div>
+              <div id="gaugeSub" class="text-sm text-muted mt-2">—</div>
+            </div>
+          </div>
+          <div class="w-full mt-5 rounded-xl bg-brandsoft px-4 py-3 flex items-center gap-3">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            <div class="min-w-0">
+              <div class="text-xs text-muted label">อัปเดตข้อมูลล่าสุด</div>
+              <div id="lastUpdated" class="font-semibold text-brand">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="lg:col-span-3 flex flex-col gap-6">
+          <div class="grid grid-cols-2 gap-4">
+            <div class="rounded-2xl border border-line bg-panel p-5">
+              <div class="text-sm text-muted">โรงเรียนทั้งหมด</div>
+              <div class="flex items-baseline gap-2 mt-1"><span id="cTotal" class="num text-4xl font-semibold">0</span><span class="text-muted text-sm">แห่ง</span></div>
+            </div>
+            <button type="button" data-filter="done" class="tile text-left rounded-2xl border border-line bg-panel p-5 hover:border-done">
+              <div class="flex items-center gap-2 text-sm text-done font-semibold"><span class="h-2.5 w-2.5 rounded-full bg-done"></span>ดำเนินการเสร็จสิ้น</div>
+              <div class="flex items-baseline gap-2 mt-1"><span id="cDone" class="num text-4xl font-semibold text-done">0</span><span id="pDone" class="num text-muted text-sm">0%</span></div>
+            </button>
+            <button type="button" data-filter="prog" class="tile text-left rounded-2xl border border-line bg-panel p-5 hover:border-prog">
+              <div class="flex items-center gap-2 text-sm text-prog font-semibold"><span class="h-2.5 w-2.5 rounded-full bg-prog"></span>อยู่ระหว่างดำเนินการ</div>
+              <div class="flex items-baseline gap-2 mt-1"><span id="cProg" class="num text-4xl font-semibold text-prog">0</span><span id="pProg" class="num text-muted text-sm">0%</span></div>
+            </button>
+            <button type="button" data-filter="todo" class="tile text-left rounded-2xl border border-line bg-panel p-5 hover:border-todo">
+              <div class="flex items-center gap-2 text-sm text-todo font-semibold"><span class="h-2.5 w-2.5 rounded-full bg-todo"></span>ยังไม่ดำเนินการ</div>
+              <div class="flex items-baseline gap-2 mt-1"><span id="cTodo" class="num text-4xl font-semibold text-todo">0</span><span id="pTodo" class="num text-muted text-sm">0%</span></div>
+            </button>
+          </div>
+
+          <div class="rounded-2xl border border-line bg-panel p-5">
+            <div class="flex items-center justify-between gap-2">
+              <h2 class="text-base font-semibold">สัดส่วนสถานะโรงเรียน</h2>
+              <span class="text-xs text-muted">กดที่การ์ดสถานะเพื่อกรองรายการ</span>
+            </div>
+            <div class="mt-3 flex h-4 w-full overflow-hidden rounded-full bg-line" aria-hidden="true">
+              <div id="bDone" class="bar-fill bg-done" style="width:0"></div>
+              <div id="bProg" class="bar-fill bg-prog" style="width:0"></div>
+              <div id="bTodo" class="bar-fill bg-todo" style="width:0"></div>
+            </div>
+            <dl class="mt-4 grid gap-2 text-sm sm:grid-cols-3">
+              <div class="flex justify-between sm:block"><dt class="text-muted">บันทึกข้อมูลแล้ว (โรงเรียนส่ง)</dt><dd id="sSubmitted" class="num font-semibold">0/0</dd></div>
+              <div class="flex justify-between sm:block"><dt class="text-muted">เขตอนุมัติแล้ว</dt><dd id="sApproved" class="num font-semibold">0/0</dd></div>
+              <div class="flex justify-between sm:block"><dt class="text-muted">ต้องติดตามเร่งด่วน</dt><dd id="sUrgent" class="num font-semibold text-todo">0 แห่ง</dd></div>
+            </dl>
+          </div>
+        </div>
+      </section>
+
+      <section class="rounded-2xl border border-line bg-panel" aria-label="รายการโรงเรียน">
+        <div class="flex flex-col gap-3 border-b border-line p-5 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 class="text-base font-semibold">รายการโรงเรียน</h2>
+            <p class="text-sm text-muted">เรียงตามสถานะการดำเนินการของโรงเรียน: ยังไม่บันทึกข้อมูล → บันทึกข้อมูลแล้ว (เรียงจากเก่าไปใหม่)</p>
+          </div>
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div class="flex rounded-lg border border-line p-1 text-sm" aria-label="กรองตามสถานะ">
+              <button type="button" data-filter="all" class="seg flex-1 rounded-md px-3 py-1.5">ทั้งหมด</button>
+              <button type="button" data-filter="todo" class="seg flex-1 rounded-md px-3 py-1.5">ยังไม่</button>
+              <button type="button" data-filter="prog" class="seg flex-1 rounded-md px-3 py-1.5">ระหว่าง</button>
+              <button type="button" data-filter="done" class="seg flex-1 rounded-md px-3 py-1.5">เสร็จสิ้น</button>
+            </div>
+            <input id="search" type="search" placeholder="ค้นหาชื่อโรงเรียน / รหัส" class="h-10 w-full sm:w-56 rounded-lg border border-line bg-panel px-3 text-sm" aria-label="ค้นหาโรงเรียน">
+          </div>
+        </div>
+        <div class="hidden md:block overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-paper text-muted">
+              <tr>
+                <th class="px-5 py-3 text-left font-medium w-12">#</th>
+                <th class="px-5 py-3 text-left font-medium">ชื่อโรงเรียน</th>
+                <th class="px-5 py-3 text-left font-medium">สถานะ</th>
+                <th class="px-5 py-3 text-left font-medium w-56">ความก้าวหน้า</th>
+                <th class="px-5 py-3 text-left font-medium">วันที่อัปเดตล่าสุด</th>
+              </tr>
+            </thead>
+            <tbody id="tbody" class="divide-y divide-[var(--line)]"></tbody>
+          </table>
+        </div>
+        <ul id="cards" class="md:hidden divide-y divide-[var(--line)]"></ul>
+        <p id="empty" hidden class="p-8 text-center text-muted">ไม่พบโรงเรียนที่ตรงกับเงื่อนไข</p>
+        <div class="border-t border-line px-5 py-3 text-xs text-muted flex flex-wrap justify-between gap-2">
+          <span id="countLine">—</span>
+          <span>ไม่แสดงชื่อหรือข้อมูลส่วนบุคคลของผู้ให้ข้อมูล</span>
+        </div>
+      </section>
+    </div>
+
+    <!-- ===================== SURVEY VIEW ===================== -->
+    <div id="view-survey" class="flex flex-col gap-6" hidden>
+      <div id="surveyEmpty" hidden class="rounded-2xl border border-dashed border-line bg-panel p-8 text-center text-muted">
+        ยังไม่มีข้อมูลชีต “ความต้องการอินเทอร์เน็ต” โปรดอัปโหลดไฟล์ Excel ที่มีชีตนี้
+      </div>
+
+      <div id="surveyBody" class="flex flex-col gap-6">
+        <!-- Executive summary -->
+        <section class="rounded-2xl border border-line bg-panel p-6" aria-label="สรุปสำหรับผู้บริหาร">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p class="text-xs text-brand font-semibold label">สรุปสำหรับผู้บริหาร</p>
+              <h2 class="text-lg font-bold mt-0.5">ผลสำรวจความพร้อมการใช้งานอินเทอร์เน็ตของสถานศึกษา</h2>
+              <p id="sumAsOf" class="text-sm text-muted">—</p>
+            </div>
+            <button id="copyBtn" type="button" class="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-brand px-4 text-sm font-semibold text-brand hover:bg-brandsoft">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+              <span id="copyLabel">คัดลอกข้อความรายงาน</span>
+            </button>
+          </div>
+          <ol id="sumList" class="mt-4 flex flex-col gap-2.5 text-[15px]"></ol>
+          <textarea id="copyFallback" hidden readonly class="mt-3 h-40 w-full rounded-lg border border-line p-3 text-sm" aria-label="ข้อความรายงานสำหรับคัดลอก"></textarea>
+          <p id="sumCaveat" class="mt-4 rounded-lg bg-progsoft px-3 py-2 text-sm text-prog" hidden></p>
+        </section>
+
+        <!-- KPI tiles -->
+        <section id="kpis" class="grid grid-cols-2 gap-4 lg:grid-cols-4" aria-label="ตัวชี้วัดหลัก"></section>
+
+        <div class="grid gap-6 lg:grid-cols-2">
+          <!-- Question distributions -->
+          <section class="rounded-2xl border border-line bg-panel p-5" aria-label="สภาพสัญญาณและคุณภาพ">
+            <h2 class="text-base font-semibold">สภาพสัญญาณและความพร้อม</h2>
+            <p class="text-sm text-muted">จำนวนโรงเรียนตามคำตอบ แต่ละข้อ</p>
+            <div id="qBars" class="mt-4 flex flex-col gap-4"></div>
+            <div class="mt-4 flex flex-wrap gap-4 text-xs text-muted">
+              <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-done"></span>พร้อม / ดี</span>
+              <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-prog"></span>บางส่วน / พอใช้</span>
+              <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-todo"></span>ไม่มี / ไม่ครอบคลุม</span>
+            </div>
+          </section>
+
+          <!-- Problems -->
+          <section class="rounded-2xl border border-line bg-panel p-5 flex flex-col" aria-label="ปัญหาที่พบ">
+            <h2 class="text-base font-semibold">ปัญหาการใช้งานที่พบ</h2>
+            <p class="text-sm text-muted">ร้อยละของโรงเรียนที่ตอบ (เลือกได้มากกว่า 1 ข้อ)</p>
+            <div id="pBars" class="mt-4 flex flex-col gap-4"></div>
+            <div id="suggBox" class="mt-6 border-t border-line pt-4">
+              <h3 class="text-sm font-semibold">ข้อเสนอแนะจากสถานศึกษา</h3>
+              <ul id="suggList" class="mt-2 flex flex-col gap-2 text-sm"></ul>
+            </div>
+          </section>
+        </div>
+
+        <p id="publicNote" class="rounded-lg border border-dashed border-line px-4 py-3 text-sm text-muted">หน้านี้แสดงเฉพาะภาพรวม ไม่ระบุคำตอบรายโรงเรียน เจ้าหน้าที่ดูรายละเอียดได้โดยอัปโหลดไฟล์ Excel ซึ่งประมวลผลเฉพาะในเครื่องของท่าน</p>
+
+        <!-- Per-school matrix -->
+        <section id="matrixBox" class="rounded-2xl border border-line bg-panel" aria-label="รายโรงเรียน">
+          <div class="border-b border-line p-5">
+            <h2 class="text-base font-semibold">ประเด็นที่ต้องปรับปรุงรายโรงเรียน</h2>
+            <p class="text-sm text-muted">เรียงจากโรงเรียนที่มีประเด็นมากที่สุด · นับประเด็นจากคำตอบ “ไม่ครอบคลุม / ไม่มี” และการพบปัญหาตั้งแต่ 2 ข้อขึ้นไป</p>
+          </div>
+          <div class="hidden md:block overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead id="mHead" class="bg-paper text-muted"></thead>
+              <tbody id="mBody" class="divide-y divide-[var(--line)]"></tbody>
+            </table>
+          </div>
+          <ul id="mCards" class="md:hidden divide-y divide-[var(--line)]"></ul>
+          <div class="border-t border-line px-5 py-3 text-xs text-muted">ไม่แสดงชื่อ ตำแหน่ง และเบอร์โทรของผู้ตอบแบบสำรวจ</div>
+        </section>
+      </div>
+    </div>
+
+    <!-- How-to -->
+    <section class="rounded-2xl border border-dashed border-line p-5 text-sm text-muted" id="dropZone">
+      <h2 class="text-ink font-semibold text-base">วิธีปรับปรุงข้อมูล</h2>
+      <p class="mt-1">เกณฑ์ความก้าวหน้า: ยังไม่บันทึกข้อมูล = 0% · โรงเรียนบันทึกแล้ว รอเขตอนุมัติ = 50% · เขตอนุมัติข้อมูลแล้ว = 100%</p>
+      <button id="resetBtn" type="button" hidden class="mt-3 rounded-lg border border-line bg-panel px-3 py-1.5 text-ink hover:border-brand">กลับไปใช้ข้อมูลตั้งต้น</button>
+    </section>
+  </div>
+</main>
+
+<script>
+/* ---------- Seed data from the attached file (personal columns removed) ---------- */
+const SEED_ROUND = 'การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา';
+const SEED = [
+  ['1093340260','พัทลุง','ยังไม่บันทึกข้อมูล','-','-'],
+  ['1093340262','เตรียมอุดมศึกษาพัฒนาการ พัทลุง','ยังไม่บันทึกข้อมูล','-','-'],
+  ['1093340263','พรหมพินิตชัยบุรี','ยังไม่บันทึกข้อมูล','-','-'],
+  ['1093340264','ประภัสสรรังสิต','ยังไม่บันทึกข้อมูล','-','-'],
+  ['1093340265','วชิรธรรมสถิต','บันทึกข้อมูลแล้ว 30 ต.ค. 2569 15:16','อนุมัติข้อมูลแล้ว 01 พ.ย. 2569 19:07','01 พ.ย. 2569 19:07'],
+  ['1093340261','สตรีพัทลุง','ยังไม่บันทึกข้อมูล','-','-'],
+  ['1093340267','กงหราพิชากร','ยังไม่บันทึกข้อมูล','-','-'],
+  ['1093340268','ชะรัดชนูปถัมภ์','ยังไม่บันทึกข้อมูล','-','-'],
+  ['1093340270','หานโพธิ์พิทยาคม','ยังไม่บันทึกข้อมูล','-','-'],
+  ['1093340272','ประชาบำรุงอุทิตกิจจาทร','บันทึกข้อมูลแล้ว 30 ต.ค. 2569 16:57','อนุมัติข้อมูลแล้ว 01 พ.ย. 2569 19:09','01 พ.ย. 2569 19:09'],
+  ['1093340271','ตะโหมด','ยังไม่บันทึกข้อมูล','-','-'],
+  ['1093340273','ควนขนุน','ยังไม่บันทึกข้อมูล','-','-'],
+  ['1093340274','พนางตุง','ยังไม่บันทึกข้อมูล','-','-'],
+  ['1093340277','ดอนศาลานำวิทยา','บันทึกข้อมูลแล้ว 30 ต.ค. 2569 20:19','อนุมัติข้อมูลแล้ว 01 พ.ย. 2569 19:09','01 พ.ย. 2569 19:09'],
+  ['1093340278','ปัญญาวุธ','ยังไม่บันทึกข้อมูล','-','-'],
+  ['1093340281','ควนพระสาครินทร์','ยังไม่บันทึกข้อมูล','-','-'],
+  ['1093340280','ปากพะยูนพิทยาคาร','ยังไม่บันทึกข้อมูล','-','-'],
+  ['1093340279','หารเทารังสีประชาสรรค์','ยังไม่บันทึกข้อมูล','-','-'],
+  ['1093340283','ศรีบรรพตพิทยาคม','ยังไม่บันทึกข้อมูล','-','-'],
+  ['1093340284','ตะแพนพิทยา','ยังไม่บันทึกข้อมูล','-','-'],
+  ['1093340285','ป่าบอนพิทยาคม','บันทึกข้อมูลแล้ว 30 ต.ค. 2569 16:11','อนุมัติข้อมูลแล้ว 01 พ.ย. 2569 19:11','01 พ.ย. 2569 19:11'],
+  ['1093340286','บางแก้วพิทยาคม','ยังไม่บันทึกข้อมูล','-','-'],
+  ['1093340287','ป่าพะยอมพิทยาคม','บันทึกข้อมูลแล้ว 31 ต.ค. 2569 09:54','อนุมัติข้อมูลแล้ว 01 พ.ย. 2569 19:12','01 พ.ย. 2569 19:12'],
+  ['1093340288','นิคมควนขนุนวิทยา','ยังไม่บันทึกข้อมูล','-','-'],
+  ['1093340269','เขาชัยสน','บันทึกข้อมูลแล้ว 30 ต.ค. 2569 16:55','อนุมัติข้อมูลแล้ว 01 พ.ย. 2569 19:12','01 พ.ย. 2569 19:12'],
+  ['1093340276','นาขยาดวิทยาคาร','ยังไม่บันทึกข้อมูล','-','-'],
+  ['1093340275','อุดมวิทยายน','ยังไม่บันทึกข้อมูล','-','-']
+].map(r => ({ round: SEED_ROUND, code: r[0], name: r[1], sStatus: r[2], dStatus: r[3], last: r[4] }));
+
+const Q_COVER = 'สัญญาณอินเทอร์เน็ตครอบคลุมหรือไม่';
+const Q_ROOM = 'สัญญาณอินเทอร์เน็ตห้องเรียน';
+const Q_MEET = 'สัญญาณอินเทอร์เน็ตห้องประชุม';
+const Q_LIB = 'สัญญาณอินเทอร์เน็ตห้องสมุด';
+const Q_TEACH = 'สัญญาณอินเทอร์เน็ตห้องพักครู';
+const Q_QUAL = 'คุณภาพของอินเทอร์เน็ตของสถานศึกษา';
+const Q_IT = 'มีบุคลากรที่ดูแลด้านระบบคอมพิวเตอร์และเครือข่ายหรือไม่';
+const P1 = 'สัญญาณหลุดบ่อยไม่เสถียร', P2 = 'อินเทอร์เน็ตช้าผิดปกติ', P3 = 'สัญญาณ Wi-Fi ไปไม่ถึงหรือสัญญาณอ่อน', P4 = 'ไม่สามารถเชื่อมต่อเครือข่ายอินเทอร์เน็ตได้';
+/* Public seed holds totals only: per-school answers come from an uploaded file and stay in that browser */
+const SEED_SURVEY = {
+  questions: [Q_COVER, Q_ROOM, Q_MEET, Q_LIB, Q_TEACH, Q_QUAL, Q_IT],
+  problems: [P1, P2, P3, P4],
+  rows: [],
+  totals: {
+    n: 6,
+    answers: {
+      [Q_COVER]: { 'ครอบคลุม': 3, 'ไม่ครอบคลุม': 3 },
+      [Q_ROOM]: { 'มีทุกห้อง': 2, 'มีบางห้อง': 4 },
+      [Q_MEET]: { 'มีทุกห้อง': 3, 'มีบางห้อง': 3 },
+      [Q_LIB]: { 'มี': 6 },
+      [Q_TEACH]: { 'มี': 6 },
+      [Q_QUAL]: { 'ใช้ได้ดี': 1, 'พอใช้ได้': 5 },
+      [Q_IT]: { 'มี': 4, 'ไม่มี': 2 }
+    },
+    problems: { [P1]: 2, [P2]: 2, [P3]: 5, [P4]: 0 },
+    priority: 3
+  }
+};
+
+/* ---------- Helpers ---------- */
+const TH_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const TH_MONTHS_FULL = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+function parseThaiDate(v) {
+  if (v == null) return null;
+  if (v instanceof Date && !isNaN(v)) return v;
+  const s = String(v).trim();
+  if (!s || s === '-') return null;
+  const m = s.match(/(\d{1,2})\s*([ก-๙]+\.?[ก-๙]*\.?)\s*(\d{4})(?:\s+(\d{1,2})[:.](\d{2}))?/);
+  if (m) {
+    const mi = TH_MONTHS.findIndex(x => x.replace(/\./g,'') === m[2].replace(/\./g,''));
+    if (mi >= 0) { let y = +m[3]; if (y > 2400) y -= 543; return new Date(y, mi, +m[1], +(m[4] || 0), +(m[5] || 0)); }
+  }
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+const pad = n => String(n).padStart(2, '0');
+const fmtShort = d => d ? `${pad(d.getDate())} ${TH_MONTHS[d.getMonth()]} ${d.getFullYear() + 543} ${pad(d.getHours())}:${pad(d.getMinutes())} น.` : '—';
+const fmtLong  = d => d ? `${d.getDate()} ${TH_MONTHS_FULL[d.getMonth()]} ${d.getFullYear() + 543} เวลา ${pad(d.getHours())}:${pad(d.getMinutes())} น.` : '—';
+const f1 = x => (Math.round(x * 10) / 10).toLocaleString('th-TH', { maximumFractionDigits: 1 });
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const norm = h => String(h || '').replace(/\s+/g, ' ').trim();
+
+/* ---------- Status logic ---------- */
+const STATUS = {
+  todo: { label: 'ยังไม่ดำเนินการ',    order: 0, cls: 'bg-todosoft text-todo', bar: 'bg-todo', dot: 'bg-todo' },
+  prog: { label: 'อยู่ระหว่างดำเนินการ', order: 1, cls: 'bg-progsoft text-prog', bar: 'bg-prog', dot: 'bg-prog' },
+  done: { label: 'ดำเนินการเสร็จสิ้น',   order: 2, cls: 'bg-donesoft text-done', bar: 'bg-done', dot: 'bg-done' }
+};
+function classify(row) {
+  const s = String(row.sStatus || '').trim(), d = String(row.dStatus || '').trim();
+  if (/อนุมัติข้อมูลแล้ว|อนุมัติแล้ว/.test(d) && !/ไม่อนุมัติ/.test(d)) return { key: 'done', pct: 100, note: 'เขตอนุมัติข้อมูลแล้ว' };
+  if (!s || s === '-' || /ยังไม่/.test(s)) return { key: 'todo', pct: 0, note: 'ยังไม่บันทึกข้อมูล' };
+  if (/ไม่อนุมัติ|ส่งกลับ|แก้ไข/.test(d)) return { key: 'prog', pct: 25, note: 'เขตส่งกลับให้แก้ไข' };
+  return { key: 'prog', pct: 50, note: 'บันทึกแล้ว · รอเขตอนุมัติ' };
+}
+const enrich = rows => rows.map(r => ({ ...r, ...classify(r), lastDate: parseThaiDate(r.last) || parseThaiDate(r.dStatus) || parseThaiDate(r.sStatus), sDate: parseThaiDate(r.sStatus) }));
+const notSaved = r => { const s = String(r.sStatus || '').trim(); return !s || s === '-' || /ยังไม่/.test(s); };
+// Column "สถานะการดำเนินการ: โรงเรียน": not saved first (by name), then saved, oldest first; saved without a date goes last
+const bySchoolStatus = (a, b) => notSaved(b) - notSaved(a) || (a.sDate || Infinity) - (b.sDate || Infinity) || a.name.localeCompare(b.name, 'th');
+function statusAgg(rows) {
+  const data = enrich(rows), n = { todo: 0, prog: 0, done: 0 };
+  data.forEach(r => n[r.key]++);
+  const total = data.length;
+  return { data, n, total, overall: total ? data.reduce((a, r) => a + r.pct, 0) / total : 0,
+    latest: data.reduce((m, r) => (r.lastDate && (!m || r.lastDate > m)) ? r.lastDate : m, null) };
+}
+
+/* ---------- Survey logic ---------- */
+const SHORT = [
+  [/ครอบคลุมหรือไม่/, 'ความครอบคลุมของสัญญาณ'], [/ห้องเรียน/, 'สัญญาณในห้องเรียน'], [/ห้องประชุม/, 'สัญญาณในห้องประชุม'],
+  [/ห้องสมุด/, 'สัญญาณในห้องสมุด'], [/ห้องพักครู/, 'สัญญาณในห้องพักครู'], [/คุณภาพ/, 'คุณภาพอินเทอร์เน็ต'], [/บุคลากร/, 'บุคลากรดูแลระบบเครือข่าย']
+];
+const shortLabel = h => (SHORT.find(([re]) => re.test(h)) || [null, h])[1];
+const GOOD = ['ครอบคลุม','มีทุกห้อง','มี','ใช้ได้ดี','ดี','ดีมาก'];
+const MID  = ['มีบางห้อง','พอใช้ได้','พอใช้','ปานกลาง','บางส่วน'];
+function tone(v) {
+  v = String(v || '').trim();
+  if (!v || v === '-') return 'neu';
+  if (GOOD.includes(v)) return 'good';
+  if (MID.includes(v)) return 'mid';
+  if (/^ไม่|ใช้ไม่ได้|แย่|ต้องปรับปรุง/.test(v)) return 'bad';
+  return 'neu';
+}
+const TONE_ORDER = { good: 0, mid: 1, bad: 2, neu: 3 };
+const TONE_BG = { good: 'bg-done', mid: 'bg-prog', bad: 'bg-todo', neu: 'bg-neu' };
+const TONE_CHIP = { good: 'bg-donesoft text-done', mid: 'bg-progsoft text-prog', bad: 'bg-todosoft text-todo', neu: 'bg-neusoft text-muted' };
+const isEmptySugg = s => !s || /^(-|ไม่มี|ไม่มีข้อเสนอแนะ|n\/?a)$/i.test(String(s).trim());
+
+function issuesOf(r, questions) {
+  const list = questions.filter(q => tone(r.ans[q]) === 'bad').map(q => `${shortLabel(q).replace(/^สัญญาณใน/, 'สัญญาณ')}: ${r.ans[q]}`);
+  if (r.probs.length >= 2) list.push(`พบปัญหา ${r.probs.length} ข้อ`);
+  return list;
+}
+function surveyAgg(sv) {
+  const rows = sv.rows, T = sv.totals, n = T ? T.n : rows.length;
+  const dist = sv.questions.map(q => {
+    const counts = T ? T.answers[q] : {};
+    rows.forEach(r => { const v = String(r.ans[q] || '-').trim() || '-'; counts[v] = (counts[v] || 0) + 1; });
+    const items = Object.entries(counts).map(([v, c]) => ({ v, c, t: tone(v) })).sort((a, b) => TONE_ORDER[a.t] - TONE_ORDER[b.t] || b.c - a.c);
+    return { q, label: shortLabel(q), items };
+  });
+  const probs = sv.problems.map(p => ({ p, c: T ? T.problems[p] : rows.filter(r => r.probs.includes(p)).length })).sort((a, b) => b.c - a.c);
+  const schools = rows.map(r => ({ ...r, issues: issuesOf(r, sv.questions), mids: sv.questions.filter(q => tone(r.ans[q]) === 'mid').length }))
+    .sort((a, b) => b.issues.length - a.issues.length || b.probs.length - a.probs.length || b.mids - a.mids || a.name.localeCompare(b.name, 'th'));
+  const share = (q, pred) => { const d = dist.find(x => x.q === q); if (!d) return null; const c = d.items.filter(pred).reduce((a, x) => a + x.c, 0); return { c, pct: n ? c / n * 100 : 0 }; };
+  const findQ = re => sv.questions.find(q => re.test(q));
+  return { n, dist, probs, schools, share, findQ, suggs: rows.filter(r => !isEmptySugg(r.sugg)) };
+}
+
+/* ---------- Excel parsing ---------- */
+const PERSONAL = /ผู้ให้ข้อมูล|ชื่อ\s*-?\s*สกุล|^ชื่อ|นามสกุล|ตำแหน่ง|หน่วยงาน|เบอร์|โทร|อีเมล|e-?mail|line/i;
+const NAME_COL = h => /^โรงเรียน$|ชื่อโรงเรียน|^สถานศึกษา$|^ชื่อสถานศึกษา$/.test(h);
+const findCol = (h, res) => h.findIndex(x => res.some(re => re.test(norm(x))));
+
+function parseStatus(rows, hi) {
+  const h = rows[hi].map(norm);
+  const idx = { round: findCol(h, [/รอบ/]), code: findCol(h, [/^รหัส/]), name: h.findIndex(NAME_COL),
+    s: findCol(h, [/สถานะ.*โรงเรียน/]), d: findCol(h, [/สถานะ.*เขต/]), last: findCol(h, [/วันที่.*ล่าสุด/, /ล่าสุด/]) };
+  const out = [];
+  for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i], name = norm(r[idx.name]);
+    if (!name) continue;
+    out.push({ round: idx.round >= 0 ? norm(r[idx.round]) : '', code: idx.code >= 0 ? norm(r[idx.code]) : '', name,
+      sStatus: norm(r[idx.s]), dStatus: idx.d >= 0 ? norm(r[idx.d]) : '', last: idx.last >= 0 ? norm(r[idx.last]) : '' });
+  }
+  return out;
+}
+function parseSurvey(rows, hi) {
+  const h = rows[hi].map(norm);
+  const cols = { round: -1, code: -1, name: -1, sugg: -1, q: [], p: [] };
+  h.forEach((x, j) => {
+    if (!x) return;
+    if (NAME_COL(x)) cols.name = j;
+    else if (/^รหัส/.test(x)) cols.code = j;
+    else if (/^รอบ/.test(x)) cols.round = j;
+    else if (PERSONAL.test(x)) return;                       // personal data: dropped, never read
+    else if (/^ปัญหา/.test(x)) cols.p.push(j);
+    else if (/ข้อเสนอแนะ|ความคิดเห็น|สิ่งที่ต้องการ/.test(x)) cols.sugg = j;
+    else cols.q.push(j);
+  });
+  const questions = cols.q.map(j => h[j]);
+  const problems = cols.p.map(j => h[j].replace(/^ปัญหา\s*[:：]\s*/, ''));
+  const out = [];
+  for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i], name = norm(r[cols.name]);
+    if (!name) continue;
+    const ans = {}; cols.q.forEach((j, k) => ans[questions[k]] = norm(r[j]));
+    const probs = cols.p.map((j, k) => { const v = norm(r[j]); return v && !/^(-|0|ไม่|false|no)$/i.test(v) ? problems[k] : null; }).filter(Boolean);
+    out.push({ round: cols.round >= 0 ? norm(r[cols.round]) : '', code: cols.code >= 0 ? norm(r[cols.code]) : '', name, ans, probs, sugg: cols.sugg >= 0 ? norm(r[cols.sugg]) : '' });
+  }
+  return { questions, problems, rows: out };
+}
+function parseWorkbook(wb) {
+  let status = null, survey = null;
+  for (const name of wb.SheetNames) {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false, defval: '' });
+    for (let i = 0; i < Math.min(rows.length, 10); i++) {
+      const h = rows[i].map(norm);
+      if (h.findIndex(NAME_COL) < 0) continue;
+      if (!status && findCol(h, [/สถานะ.*โรงเรียน/]) >= 0) { status = parseStatus(rows, i); break; }
+      if (!survey && findCol(h, [/^ปัญหา/, /คุณภาพ/, /สัญญาณ/]) >= 0) { survey = parseSurvey(rows, i); break; }
+    }
+  }
+  if (!status && !survey) throw new Error('ไม่พบชีต “สถานะการบันทึกข้อมูล” หรือ “ความต้องการอินเทอร์เน็ต” ในไฟล์นี้ โปรดตรวจสอบว่าเป็นไฟล์รายงานจากระบบ');
+  return { status, survey };
+}
+
+/* ---------- State ---------- */
+const LS_KEY = 'sesao-pt-net-tracking-v2';
+let state = { rows: SEED, survey: SEED_SURVEY, source: 'seed', fileName: '', importedAt: null, round: null, filter: 'all', q: '', tab: 'status' };
+try {
+  const saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+  if (saved && (saved.rows || saved.survey)) {
+    state.rows = saved.rows || []; state.survey = saved.survey || null; state.source = 'upload';
+    state.fileName = saved.fileName || ''; state.importedAt = saved.importedAt ? new Date(saved.importedAt) : null;
+  }
+} catch (e) {}
+
+function showNotice(msg, kind) {
+  const n = $('notice');
+  n.className = 'rounded-lg border px-4 py-3 text-sm ' + (kind === 'error' ? 'border-todo bg-todosoft text-todo' : 'border-done bg-donesoft text-done');
+  n.textContent = msg; n.hidden = false;
+}
+
+/* ---------- Render: shared ---------- */
+function currentStatusRows() { return state.rows.filter(r => !state.round || !r.round || r.round === state.round); }
+function currentSurvey() {
+  if (!state.survey) return null;
+  const rows = state.survey.rows.filter(r => !state.round || !r.round || r.round === state.round);
+  return { ...state.survey, rows };
+}
+function render() {
+  const rounds = [...new Set([...state.rows, ...(state.survey ? state.survey.rows : [])].map(r => r.round).filter(Boolean))];
+  const sel = $('roundSelect');
+  if (rounds.length > 1) {
+    if (!rounds.includes(state.round)) state.round = rounds[0];
+    sel.innerHTML = rounds.map(r => `<option ${r === state.round ? 'selected' : ''}>${esc(r)}</option>`).join('');
+    sel.classList.remove('hidden');
+  } else { state.round = rounds[0] || null; sel.classList.add('hidden'); }
+  $('roundName').textContent = (state.round || 'รอบบันทึกข้อมูล') + (state.source === 'upload' && state.fileName ? ` · ไฟล์: ${state.fileName}` : '');
+
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.tab === state.tab)));
+  $('view-status').hidden = state.tab !== 'status';
+  $('view-survey').hidden = state.tab !== 'survey';
+  $('resetBtn').hidden = state.source !== 'upload';
+
+  const sa = statusAgg(currentStatusRows());
+  renderStatus(sa);
+  renderSurvey(sa);
+}
+
+/* ---------- Render: status ---------- */
+function renderStatus(sa) {
+  const { data, n, total, overall, latest } = sa;
+  const pctOf = x => total ? x / total * 100 : 0;
+  $('gaugeArc').style.strokeDashoffset = String(100 - overall);
+  $('gaugeArc').setAttribute('stroke', overall >= 100 ? 'var(--done)' : 'var(--brand)');
+  $('gaugeText').textContent = f1(overall) + '%';
+  $('gaugeSub').textContent = `เสร็จสิ้น ${n.done} จาก ${total} โรงเรียน`;
+  $('lastUpdated').textContent = fmtLong(latest || state.importedAt);
+  $('cTotal').textContent = total;
+  $('cDone').textContent = n.done; $('pDone').textContent = f1(pctOf(n.done)) + '%';
+  $('cProg').textContent = n.prog; $('pProg').textContent = f1(pctOf(n.prog)) + '%';
+  $('cTodo').textContent = n.todo; $('pTodo').textContent = f1(pctOf(n.todo)) + '%';
+  $('bDone').style.width = pctOf(n.done) + '%'; $('bProg').style.width = pctOf(n.prog) + '%'; $('bTodo').style.width = pctOf(n.todo) + '%';
+  $('sSubmitted').textContent = `${n.done + n.prog}/${total}`;
+  $('sApproved').textContent = `${n.done}/${total}`;
+  $('sUrgent').textContent = `${n.todo} แห่ง`;
+
+  document.querySelectorAll('.seg').forEach(b => {
+    const on = b.dataset.filter === state.filter;
+    b.className = 'seg flex-1 rounded-md px-3 py-1.5 ' + (on ? 'bg-brand text-white font-semibold' : 'text-muted hover:text-ink');
+    b.setAttribute('aria-pressed', on);
+  });
+  document.querySelectorAll('.tile').forEach(t => { t.style.boxShadow = t.dataset.filter === state.filter ? `0 0 0 2px var(--${t.dataset.filter})` : 'none'; });
+
+  const q = state.q.trim().toLowerCase();
+  const list = data.filter(r => state.filter === 'all' || r.key === state.filter)
+    .filter(r => !q || r.name.toLowerCase().includes(q) || r.code.includes(q))
+    .sort(bySchoolStatus);
+  const badge = r => `<span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS[r.key].cls}"><span class="h-1.5 w-1.5 rounded-full ${STATUS[r.key].dot}"></span>${STATUS[r.key].label}</span>`;
+  const bar = r => `<div class="flex items-center gap-3"><div class="h-2 flex-1 rounded-full bg-line overflow-hidden"><div class="h-full rounded-full ${STATUS[r.key].bar}" style="width:${r.pct}%"></div></div><span class="num w-11 text-right font-semibold">${r.pct}%</span></div>`;
+  $('tbody').innerHTML = list.map((r, i) => `
+    <tr>
+      <td class="px-5 py-3 num text-muted">${i + 1}</td>
+      <td class="px-5 py-3"><div class="font-medium">${esc(r.name)}</div>${r.code ? `<div class="num text-xs text-muted">${esc(r.code)}</div>` : ''}</td>
+      <td class="px-5 py-3">${badge(r)}<div class="text-xs text-muted mt-1">${r.note}</div>${r.sDate ? `<div class="text-xs text-muted">โรงเรียนบันทึก ${fmtShort(r.sDate)}</div>` : ''}</td>
+      <td class="px-5 py-3">${bar(r)}</td>
+      <td class="px-5 py-3 whitespace-nowrap ${r.lastDate ? '' : 'text-muted'}">${r.lastDate ? fmtShort(r.lastDate) : '—'}</td>
+    </tr>`).join('');
+  $('cards').innerHTML = list.map((r, i) => `
+    <li class="p-4 flex flex-col gap-2">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0"><div class="font-medium"><span class="num text-muted text-xs mr-1">${i + 1}.</span>${esc(r.name)}</div>${r.code ? `<div class="num text-xs text-muted">${esc(r.code)}</div>` : ''}</div>
+        ${badge(r)}
+      </div>
+      ${bar(r)}
+      ${r.sDate ? `<div class="text-xs text-muted">โรงเรียนบันทึก ${fmtShort(r.sDate)}</div>` : ''}
+      <div class="flex justify-between gap-2 text-xs text-muted"><span>${r.note}</span><span>${r.lastDate ? 'อัปเดต ' + fmtShort(r.lastDate) : 'ยังไม่มีการอัปเดต'}</span></div>
+    </li>`).join('');
+  $('empty').hidden = list.length > 0;
+  $('countLine').textContent = `แสดง ${list.length} จาก ${total} โรงเรียน` + (state.importedAt ? ` · นำเข้าไฟล์เมื่อ ${fmtShort(state.importedAt)}` : ' · ข้อมูลตั้งต้นจากไฟล์ที่แนบมา');
+}
+
+/* ---------- Render: survey ---------- */
+let reportText = '';
+function renderSurvey(sa) {
+  const sv = currentSurvey();
+  const has = sv && (sv.totals || sv.rows.length);
+  $('surveyEmpty').hidden = !!has;
+  $('surveyBody').hidden = !has;
+  if (!has) { reportText = ''; return; }
+  const totalsOnly = !!sv.totals;
+  $('publicNote').hidden = !totalsOnly;
+  $('matrixBox').hidden = totalsOnly;
+  $('suggBox').hidden = totalsOnly;
+  const A = surveyAgg(sv);
+  const N = A.n, totalSchools = sa.total || N;
+  const pctN = c => N ? c / N * 100 : 0;
+  const asOf = sa.latest || state.importedAt;
+  $('sumAsOf').textContent = `ข้อมูล ณ ${fmtLong(asOf)} · จากโรงเรียนที่ตอบแบบสำรวจ ${N} แห่ง`;
+
+  // KPI tiles
+  const qCover = A.findQ(/ครอบคลุม/), qQual = A.findQ(/คุณภาพ/), qIT = A.findQ(/บุคลากร/), qRoom = A.findQ(/ห้องเรียน/);
+  const kpi = [];
+  kpi.push({ label: 'ตอบแบบสำรวจแล้ว', big: `${N}`, unit: `/ ${totalSchools} แห่ง`, sub: `${f1(totalSchools ? N / totalSchools * 100 : 0)}% ของโรงเรียนทั้งหมด`, t: 'brand' });
+  if (qCover) { const s = A.share(qCover, x => x.t === 'good'); kpi.push({ label: 'สัญญาณครอบคลุมทั้งโรงเรียน', big: f1(s.pct) + '%', unit: '', sub: `${s.c} จาก ${N} แห่ง`, t: s.pct >= 80 ? 'done' : s.pct >= 50 ? 'prog' : 'todo' }); }
+  if (qRoom) { const s = A.share(qRoom, x => x.t === 'good'); kpi.push({ label: 'มีสัญญาณครบทุกห้องเรียน', big: f1(s.pct) + '%', unit: '', sub: `${s.c} จาก ${N} แห่ง`, t: s.pct >= 80 ? 'done' : s.pct >= 50 ? 'prog' : 'todo' }); }
+  if (qIT) { const s = A.share(qIT, x => x.t === 'good'); kpi.push({ label: 'มีบุคลากรดูแลระบบเครือข่าย', big: f1(s.pct) + '%', unit: '', sub: `ไม่มี ${N - s.c} แห่ง`, t: s.pct >= 80 ? 'done' : s.pct >= 50 ? 'prog' : 'todo' }); }
+  else if (qQual) { const s = A.share(qQual, x => x.t === 'good'); kpi.push({ label: 'คุณภาพอินเทอร์เน็ตใช้ได้ดี', big: f1(s.pct) + '%', unit: '', sub: `${s.c} จาก ${N} แห่ง`, t: 'brand' }); }
+  const tc = { brand: 'text-brand', done: 'text-done', prog: 'text-prog', todo: 'text-todo' };
+  $('kpis').innerHTML = kpi.slice(0, 4).map(k => `
+    <div class="rounded-2xl border border-line bg-panel p-5">
+      <div class="text-sm text-muted">${k.label}</div>
+      <div class="flex items-baseline gap-1.5 mt-1"><span class="num text-3xl font-semibold ${tc[k.t]}">${k.big}</span><span class="text-sm text-muted">${k.unit}</span></div>
+      <div class="text-xs text-muted mt-1">${k.sub}</div>
+    </div>`).join('');
+
+  // Question bars
+  $('qBars').innerHTML = A.dist.map(d => `
+    <div>
+      <div class="flex justify-between gap-2 text-sm"><span class="font-medium">${esc(d.label)}</span></div>
+      <div class="mt-1.5 flex h-6 w-full overflow-hidden rounded-md bg-line">
+        ${d.items.map(it => `<div class="bar-fill ${TONE_BG[it.t]} flex items-center justify-center text-[11px] font-semibold text-white num" style="width:${pctN(it.c)}%" title="${esc(it.v)}: ${it.c} แห่ง">${pctN(it.c) >= 12 ? it.c : ''}</div>`).join('')}
+      </div>
+      <div class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted">
+        ${d.items.map(it => `<span>${esc(it.v)} <span class="num font-semibold text-ink">${it.c}</span> (${f1(pctN(it.c))}%)</span>`).join('')}
+      </div>
+    </div>`).join('');
+
+  // Problem bars
+  const maxP = Math.max(1, ...A.probs.map(p => p.c));
+  $('pBars').innerHTML = A.probs.map((p, i) => `
+    <div>
+      <div class="flex justify-between gap-3 text-sm"><span class="${i === 0 && p.c ? 'font-semibold' : ''}">${esc(p.p)}</span><span class="num whitespace-nowrap"><span class="font-semibold">${p.c}</span> แห่ง · ${f1(pctN(p.c))}%</span></div>
+      <div class="mt-1.5 h-2.5 w-full rounded-full bg-line overflow-hidden"><div class="bar-fill h-full rounded-full ${p.c === maxP && p.c ? 'bg-todo' : p.c ? 'bg-prog' : 'bg-neu'}" style="width:${pctN(p.c)}%"></div></div>
+    </div>`).join('') || '<p class="text-sm text-muted">ไม่มีข้อมูลปัญหา</p>';
+
+  $('suggList').innerHTML = A.suggs.length
+    ? A.suggs.map(r => `<li class="rounded-lg bg-paper px-3 py-2"><span class="text-ink">“${esc(r.sugg)}”</span><span class="block text-xs text-muted mt-0.5">โรงเรียน${esc(r.name)}</span></li>`).join('')
+    : '<li class="text-muted">ไม่มีข้อเสนอแนะเพิ่มเติม</li>';
+
+  // Per-school matrix
+  const showQ = [qCover, qRoom, qQual, qIT].filter(Boolean);
+  const chip = v => `<span class="inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${TONE_CHIP[tone(v)]}">${esc(v || '-')}</span>`;
+  $('mHead').innerHTML = `<tr><th class="px-5 py-3 text-left font-medium">โรงเรียน</th>${showQ.map(q => `<th class="px-4 py-3 text-left font-medium">${esc(shortLabel(q).replace('ของสัญญาณ','').replace('สัญญาณใน','').replace('บุคลากรดูแลระบบเครือข่าย','บุคลากร IT'))}</th>`).join('')}<th class="px-4 py-3 text-left font-medium">ปัญหาที่พบ</th><th class="px-4 py-3 text-center font-medium">ประเด็น</th></tr>`;
+  const issueBadge = k => `<span class="num inline-flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-sm font-semibold ${k >= 3 ? 'bg-todo text-white' : k >= 2 ? 'bg-todosoft text-todo' : k === 1 ? 'bg-progsoft text-prog' : 'bg-donesoft text-done'}">${k}</span>`;
+  $('mBody').innerHTML = A.schools.map(r => `
+    <tr>
+      <td class="px-5 py-3"><div class="font-medium">${esc(r.name)}</div>${r.code ? `<div class="num text-xs text-muted">${esc(r.code)}</div>` : ''}</td>
+      ${showQ.map(q => `<td class="px-4 py-3">${chip(r.ans[q])}</td>`).join('')}
+      <td class="px-4 py-3 text-xs">${r.probs.length ? r.probs.map(esc).join('<br>') : '<span class="text-muted">ไม่พบปัญหา</span>'}</td>
+      <td class="px-4 py-3 text-center">${issueBadge(r.issues.length)}</td>
+    </tr>`).join('');
+  $('mCards').innerHTML = A.schools.map(r => `
+    <li class="p-4 flex flex-col gap-2">
+      <div class="flex items-start justify-between gap-3"><div class="min-w-0 font-medium">${esc(r.name)}</div>${issueBadge(r.issues.length)}</div>
+      <div class="flex flex-wrap gap-1.5">${showQ.map(q => `<span class="text-xs text-muted">${esc(shortLabel(q).replace('สัญญาณใน','').replace('ของสัญญาณ',''))}</span>${chip(r.ans[q])}`).join('')}</div>
+      <div class="text-xs text-muted">${r.probs.length ? 'ปัญหา: ' + r.probs.map(esc).join(', ') : 'ไม่พบปัญหา'}</div>
+    </li>`).join('');
+
+  // Executive summary
+  const lines = [];
+  lines.push(`ความก้าวหน้าการบันทึกข้อมูล: ดำเนินการเสร็จสิ้น ${sa.n.done} จาก ${sa.total} แห่ง (${f1(sa.total ? sa.n.done / sa.total * 100 : 0)}%) อยู่ระหว่างดำเนินการ ${sa.n.prog} แห่ง และยังไม่ดำเนินการ ${sa.n.todo} แห่ง`);
+  if (qCover) { const g = A.share(qCover, x => x.t === 'good'); lines.push(`ความครอบคลุมของสัญญาณ: ครอบคลุมทั้งโรงเรียน ${g.c} แห่ง (${f1(g.pct)}%) ไม่ครอบคลุม ${N - g.c} แห่ง (${f1(100 - g.pct)}%)`); }
+  if (qRoom) { const g = A.share(qRoom, x => x.t === 'good'); lines.push(`สัญญาณในห้องเรียน: มีครบทุกห้อง ${g.c} แห่ง มีเพียงบางห้องหรือไม่มี ${N - g.c} แห่ง`); }
+  if (qQual) { const d = A.dist.find(x => x.q === qQual); lines.push(`คุณภาพอินเทอร์เน็ต: ${d.items.map(it => `${it.v} ${it.c} แห่ง`).join(', ')}`); }
+  const topP = A.probs.filter(p => p.c > 0);
+  if (topP.length) lines.push(`ปัญหาที่พบมากที่สุด: ${topP.slice(0, 3).map(p => `${p.p} ${p.c} แห่ง (${f1(pctN(p.c))}%)`).join(', ')}`);
+  if (qIT) {
+    const noIT = A.schools.filter(r => tone(r.ans[qIT]) === 'bad');
+    const noITCount = totalsOnly ? A.share(qIT, x => x.t === 'bad').c : noIT.length;
+    if (noITCount) lines.push(`บุคลากรดูแลระบบคอมพิวเตอร์และเครือข่าย: ไม่มี ${noITCount} แห่ง` + (totalsOnly ? '' : ` ได้แก่ ${noIT.map(r => r.name).join(', ')}`));
+  }
+  const prio = A.schools.filter(r => r.issues.length >= 2);
+  if (totalsOnly ? sv.totals.priority : prio.length) lines.push(`โรงเรียนที่ควรได้รับการสนับสนุนก่อน (มีประเด็นตั้งแต่ 2 ข้อ): ` + (totalsOnly ? `${sv.totals.priority} แห่ง` : prio.map(r => `${r.name} (${r.issues.length})`).join(', ')));
+  $('sumList').innerHTML = lines.map((l, i) => {
+    const [head, ...rest] = l.split(': ');
+    return `<li class="flex gap-3"><span class="num mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brandsoft text-xs font-semibold text-brand">${i + 1}</span><span class="min-w-0"><span class="font-semibold">${esc(head)}:</span> ${esc(rest.join(': '))}</span></li>`;
+  }).join('');
+  const caveat = totalSchools && N < totalSchools ? `ผลสรุปนี้มาจากโรงเรียนที่ตอบแล้ว ${N} จาก ${totalSchools} แห่ง (${f1(N / totalSchools * 100)}%) ยังไม่ใช่ภาพรวมทั้งเขต ควรติดตามโรงเรียนที่ยังไม่ดำเนินการอีก ${totalSchools - N} แห่ง` : '';
+  $('sumCaveat').textContent = caveat; $('sumCaveat').hidden = !caveat;
+  reportText = `สรุปผลการสำรวจความพร้อมการใช้งานอินเทอร์เน็ตของสถานศึกษา สพม.พัทลุง\nข้อมูล ณ ${fmtLong(asOf)}\n\n` + lines.map((l, i) => `${i + 1}. ${l}`).join('\n') + (caveat ? `\n\nหมายเหตุ: ${caveat}` : '');
+}
+
+/* ---------- Copy report ---------- */
+$('copyBtn').addEventListener('click', () => {
+  const done = () => { $('copyLabel').textContent = 'คัดลอกแล้ว'; setTimeout(() => $('copyLabel').textContent = 'คัดลอกข้อความรายงาน', 2000); };
+  const fallback = () => { const t = $('copyFallback'); t.value = reportText; t.hidden = false; t.focus(); t.select(); $('copyLabel').textContent = 'เลือกข้อความแล้ว กด Ctrl+C'; };
+  try { navigator.clipboard.writeText(reportText).then(done, fallback); } catch (e) { fallback(); }
+});
+
+/* ---------- Upload ---------- */
+function handleFile(file) {
+  if (!file) return;
+  if (typeof XLSX === 'undefined') { showNotice('โหลดตัวอ่านไฟล์ Excel ไม่สำเร็จ โปรดตรวจสอบอินเทอร์เน็ตแล้วรีเฟรชหน้า', 'error'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
+      const { status, survey } = parseWorkbook(wb);
+      state.rows = status || []; state.survey = survey; state.source = 'upload';
+      state.fileName = file.name; state.importedAt = new Date(); state.round = null;
+      try { localStorage.setItem(LS_KEY, JSON.stringify({ rows: state.rows, survey, fileName: file.name, importedAt: state.importedAt.toISOString() })); } catch (err) {}
+      const parts = [];
+      if (status) parts.push(`สถานะการบันทึก ${status.length} โรงเรียน`); else parts.push('ไม่พบชีตสถานะการบันทึก');
+      if (survey) parts.push(`ผลสำรวจ ${survey.rows.length} โรงเรียน`); else parts.push('ไม่พบชีตความต้องการอินเทอร์เน็ต');
+      showNotice(`อัปเดตข้อมูลจากไฟล์ ${file.name}: ${parts.join(' · ')}`, status && survey ? 'ok' : 'error');
+      render();
+    } catch (err) { showNotice(err.message || 'อ่านไฟล์ไม่สำเร็จ', 'error'); }
+  };
+  reader.onerror = () => showNotice('อ่านไฟล์ไม่สำเร็จ โปรดลองอีกครั้ง', 'error');
+  reader.readAsArrayBuffer(file);
+}
+$('fileInput').addEventListener('change', e => { handleFile(e.target.files[0]); e.target.value = ''; });
+const dz = document.body;
+['dragenter','dragover'].forEach(t => dz.addEventListener(t, e => { e.preventDefault(); $('dropZone').classList.add('drop-active'); }));
+['dragleave','drop'].forEach(t => dz.addEventListener(t, e => { e.preventDefault(); if (t === 'drop' || e.target === dz) $('dropZone').classList.remove('drop-active'); }));
+dz.addEventListener('drop', e => handleFile(e.dataTransfer.files[0]));
+
+$('resetBtn').addEventListener('click', () => {
+  try { localStorage.removeItem(LS_KEY); } catch (e) {}
+  Object.assign(state, { rows: SEED, survey: SEED_SURVEY, source: 'seed', fileName: '', importedAt: null, round: null });
+  showNotice('กลับไปใช้ข้อมูลตั้งต้นแล้ว', 'ok'); render();
+});
+document.querySelectorAll('[data-filter]').forEach(b => b.addEventListener('click', () => {
+  const f = b.dataset.filter;
+  state.filter = (b.classList.contains('tile') && state.filter === f) ? 'all' : f;
+  render();
+}));
+$('search').addEventListener('input', e => { state.q = e.target.value; render(); });
+$('roundSelect').addEventListener('change', e => { state.round = e.target.value; render(); });
+
+/* ---------- Tabs (bookmarkable via #status / #survey) ---------- */
+function fromHash() { const h = location.hash.replace('#', ''); state.tab = h === 'survey' ? 'survey' : 'status'; render(); }
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => { location.hash = t.dataset.tab; }));
+window.addEventListener('hashchange', fromHash);
+fromHash();
+</script>
