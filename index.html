@@ -74,6 +74,10 @@
           อัปโหลดไฟล์ Excel
         </label>
         <input id="fileInput" hidden disabled type="file" accept=".xlsx,.xls" class="sr-only">
+        <button id="publishBtn" type="button" hidden class="inline-flex h-10 items-center gap-2 rounded-lg border border-brand bg-panel px-4 text-sm font-semibold text-brand hover:bg-brandsoft">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12"/><path d="m6 10 6 6 6-6"/><path d="M4 20h16"/></svg>
+          สร้างไฟล์สำหรับเผยแพร่
+        </button>
       </div>
     </div>
     <nav class="max-w-6xl mx-auto mt-4 flex gap-6 text-sm" role="tablist" aria-label="มุมมอง">
@@ -275,66 +279,42 @@
 </main>
 
 <script>
-/* ---------- Seed data from the attached file (personal columns removed) ---------- */
-const SEED_ROUND = 'การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา';
-const SEED = [
-  ['1093340260','พัทลุง','ยังไม่บันทึกข้อมูล','-','-'],
-  ['1093340262','เตรียมอุดมศึกษาพัฒนาการ พัทลุง','ยังไม่บันทึกข้อมูล','-','-'],
-  ['1093340263','พรหมพินิตชัยบุรี','ยังไม่บันทึกข้อมูล','-','-'],
-  ['1093340264','ประภัสสรรังสิต','ยังไม่บันทึกข้อมูล','-','-'],
-  ['1093340265','วชิรธรรมสถิต','บันทึกข้อมูลแล้ว 30 ต.ค. 2569 15:16','อนุมัติข้อมูลแล้ว 01 พ.ย. 2569 19:07','01 พ.ย. 2569 19:07'],
-  ['1093340261','สตรีพัทลุง','ยังไม่บันทึกข้อมูล','-','-'],
-  ['1093340267','กงหราพิชากร','ยังไม่บันทึกข้อมูล','-','-'],
-  ['1093340268','ชะรัดชนูปถัมภ์','ยังไม่บันทึกข้อมูล','-','-'],
-  ['1093340270','หานโพธิ์พิทยาคม','ยังไม่บันทึกข้อมูล','-','-'],
-  ['1093340272','ประชาบำรุงอุทิตกิจจาทร','บันทึกข้อมูลแล้ว 30 ต.ค. 2569 16:57','อนุมัติข้อมูลแล้ว 01 พ.ย. 2569 19:09','01 พ.ย. 2569 19:09'],
-  ['1093340271','ตะโหมด','ยังไม่บันทึกข้อมูล','-','-'],
-  ['1093340273','ควนขนุน','ยังไม่บันทึกข้อมูล','-','-'],
-  ['1093340274','พนางตุง','ยังไม่บันทึกข้อมูล','-','-'],
-  ['1093340277','ดอนศาลานำวิทยา','บันทึกข้อมูลแล้ว 30 ต.ค. 2569 20:19','อนุมัติข้อมูลแล้ว 01 พ.ย. 2569 19:09','01 พ.ย. 2569 19:09'],
-  ['1093340278','ปัญญาวุธ','ยังไม่บันทึกข้อมูล','-','-'],
-  ['1093340281','ควนพระสาครินทร์','ยังไม่บันทึกข้อมูล','-','-'],
-  ['1093340280','ปากพะยูนพิทยาคาร','ยังไม่บันทึกข้อมูล','-','-'],
-  ['1093340279','หารเทารังสีประชาสรรค์','ยังไม่บันทึกข้อมูล','-','-'],
-  ['1093340283','ศรีบรรพตพิทยาคม','ยังไม่บันทึกข้อมูล','-','-'],
-  ['1093340284','ตะแพนพิทยา','ยังไม่บันทึกข้อมูล','-','-'],
-  ['1093340285','ป่าบอนพิทยาคม','บันทึกข้อมูลแล้ว 30 ต.ค. 2569 16:11','อนุมัติข้อมูลแล้ว 01 พ.ย. 2569 19:11','01 พ.ย. 2569 19:11'],
-  ['1093340286','บางแก้วพิทยาคม','ยังไม่บันทึกข้อมูล','-','-'],
-  ['1093340287','ป่าพะยอมพิทยาคม','บันทึกข้อมูลแล้ว 31 ต.ค. 2569 09:54','อนุมัติข้อมูลแล้ว 01 พ.ย. 2569 19:12','01 พ.ย. 2569 19:12'],
-  ['1093340288','นิคมควนขนุนวิทยา','ยังไม่บันทึกข้อมูล','-','-'],
-  ['1093340269','เขาชัยสน','บันทึกข้อมูลแล้ว 30 ต.ค. 2569 16:55','อนุมัติข้อมูลแล้ว 01 พ.ย. 2569 19:12','01 พ.ย. 2569 19:12'],
-  ['1093340276','นาขยาดวิทยาคาร','ยังไม่บันทึกข้อมูล','-','-'],
-  ['1093340275','อุดมวิทยายน','ยังไม่บันทึกข้อมูล','-','-']
-].map(r => ({ round: SEED_ROUND, code: r[0], name: r[1], sStatus: r[2], dStatus: r[3], last: r[4] }));
-
-const Q_COVER = 'สัญญาณอินเทอร์เน็ตครอบคลุมหรือไม่';
-const Q_ROOM = 'สัญญาณอินเทอร์เน็ตห้องเรียน';
-const Q_MEET = 'สัญญาณอินเทอร์เน็ตห้องประชุม';
-const Q_LIB = 'สัญญาณอินเทอร์เน็ตห้องสมุด';
-const Q_TEACH = 'สัญญาณอินเทอร์เน็ตห้องพักครู';
-const Q_QUAL = 'คุณภาพของอินเทอร์เน็ตของสถานศึกษา';
-const Q_IT = 'มีบุคลากรที่ดูแลด้านระบบคอมพิวเตอร์และเครือข่ายหรือไม่';
-const P1 = 'สัญญาณหลุดบ่อยไม่เสถียร', P2 = 'อินเทอร์เน็ตช้าผิดปกติ', P3 = 'สัญญาณ Wi-Fi ไปไม่ถึงหรือสัญญาณอ่อน', P4 = 'ไม่สามารถเชื่อมต่อเครือข่ายอินเทอร์เน็ตได้';
-/* Public seed holds totals only: per-school answers come from an uploaded file and stay in that browser */
-const SEED_SURVEY = {
-  questions: [Q_COVER, Q_ROOM, Q_MEET, Q_LIB, Q_TEACH, Q_QUAL, Q_IT],
-  problems: [P1, P2, P3, P4],
-  rows: [],
-  totals: {
-    n: 6,
-    answers: {
-      [Q_COVER]: { 'ครอบคลุม': 3, 'ไม่ครอบคลุม': 3 },
-      [Q_ROOM]: { 'มีทุกห้อง': 2, 'มีบางห้อง': 4 },
-      [Q_MEET]: { 'มีทุกห้อง': 3, 'มีบางห้อง': 3 },
-      [Q_LIB]: { 'มี': 6 },
-      [Q_TEACH]: { 'มี': 6 },
-      [Q_QUAL]: { 'ใช้ได้ดี': 1, 'พอใช้ได้': 5 },
-      [Q_IT]: { 'มี': 4, 'ไม่มี': 2 }
-    },
-    problems: { [P1]: 2, [P2]: 2, [P3]: 5, [P4]: 0 },
-    priority: 3
-  }
-};
+/* ---------- Published data: no personal data, survey as totals only ----------
+   The staff button "สร้างไฟล์สำหรับเผยแพร่" rewrites everything between the two markers. */
+const PUBLISHED = /*PUBLISHED-DATA-START*/{
+"status": [
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340260","name":"พัทลุง","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340262","name":"เตรียมอุดมศึกษาพัฒนาการ พัทลุง","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340263","name":"พรหมพินิตชัยบุรี","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340264","name":"ประภัสสรรังสิต","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340265","name":"วชิรธรรมสถิต","sStatus":"บันทึกข้อมูลแล้ว 30 ต.ค. 2569 15:16","dStatus":"อนุมัติข้อมูลแล้ว 01 พ.ย. 2569 19:07","last":"01 พ.ย. 2569 19:07"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340261","name":"สตรีพัทลุง","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340267","name":"กงหราพิชากร","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340268","name":"ชะรัดชนูปถัมภ์","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340270","name":"หานโพธิ์พิทยาคม","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340272","name":"ประชาบำรุงอุทิตกิจจาทร","sStatus":"บันทึกข้อมูลแล้ว 30 ต.ค. 2569 16:57","dStatus":"อนุมัติข้อมูลแล้ว 01 พ.ย. 2569 19:09","last":"01 พ.ย. 2569 19:09"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340271","name":"ตะโหมด","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340273","name":"ควนขนุน","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340274","name":"พนางตุง","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340277","name":"ดอนศาลานำวิทยา","sStatus":"บันทึกข้อมูลแล้ว 30 ต.ค. 2569 20:19","dStatus":"อนุมัติข้อมูลแล้ว 01 พ.ย. 2569 19:09","last":"01 พ.ย. 2569 19:09"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340278","name":"ปัญญาวุธ","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340281","name":"ควนพระสาครินทร์","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340280","name":"ปากพะยูนพิทยาคาร","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340279","name":"หารเทารังสีประชาสรรค์","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340283","name":"ศรีบรรพตพิทยาคม","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340284","name":"ตะแพนพิทยา","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340285","name":"ป่าบอนพิทยาคม","sStatus":"บันทึกข้อมูลแล้ว 30 ต.ค. 2569 16:11","dStatus":"อนุมัติข้อมูลแล้ว 01 พ.ย. 2569 19:11","last":"01 พ.ย. 2569 19:11"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340286","name":"บางแก้วพิทยาคม","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340287","name":"ป่าพะยอมพิทยาคม","sStatus":"บันทึกข้อมูลแล้ว 31 ต.ค. 2569 09:54","dStatus":"อนุมัติข้อมูลแล้ว 01 พ.ย. 2569 19:12","last":"01 พ.ย. 2569 19:12"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340288","name":"นิคมควนขนุนวิทยา","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340269","name":"เขาชัยสน","sStatus":"บันทึกข้อมูลแล้ว 30 ต.ค. 2569 16:55","dStatus":"อนุมัติข้อมูลแล้ว 01 พ.ย. 2569 19:12","last":"01 พ.ย. 2569 19:12"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340276","name":"นาขยาดวิทยาคาร","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"},
+{"round":"การสำรวจความพร้อมการใช้งานอินเทอร์เน็ต ของสถานศึกษา","code":"1093340275","name":"อุดมวิทยายน","sStatus":"ยังไม่บันทึกข้อมูล","dStatus":"-","last":"-"}
+],
+"survey": {"questions":["สัญญาณอินเทอร์เน็ตครอบคลุมหรือไม่","สัญญาณอินเทอร์เน็ตห้องเรียน","สัญญาณอินเทอร์เน็ตห้องประชุม","สัญญาณอินเทอร์เน็ตห้องสมุด","สัญญาณอินเทอร์เน็ตห้องพักครู","คุณภาพของอินเทอร์เน็ตของสถานศึกษา","มีบุคลากรที่ดูแลด้านระบบคอมพิวเตอร์และเครือข่ายหรือไม่"],"problems":["สัญญาณหลุดบ่อยไม่เสถียร","อินเทอร์เน็ตช้าผิดปกติ","สัญญาณ Wi-Fi ไปไม่ถึงหรือสัญญาณอ่อน","ไม่สามารถเชื่อมต่อเครือข่ายอินเทอร์เน็ตได้"],"totals":{"n":6,"answers":{"สัญญาณอินเทอร์เน็ตครอบคลุมหรือไม่":{"ครอบคลุม":3,"ไม่ครอบคลุม":3},"สัญญาณอินเทอร์เน็ตห้องเรียน":{"มีทุกห้อง":2,"มีบางห้อง":4},"สัญญาณอินเทอร์เน็ตห้องประชุม":{"มีทุกห้อง":3,"มีบางห้อง":3},"สัญญาณอินเทอร์เน็ตห้องสมุด":{"มี":6},"สัญญาณอินเทอร์เน็ตห้องพักครู":{"มี":6},"คุณภาพของอินเทอร์เน็ตของสถานศึกษา":{"ใช้ได้ดี":1,"พอใช้ได้":5},"มีบุคลากรที่ดูแลด้านระบบคอมพิวเตอร์และเครือข่ายหรือไม่":{"มี":4,"ไม่มี":2}},"problems":{"สัญญาณหลุดบ่อยไม่เสถียร":2,"อินเทอร์เน็ตช้าผิดปกติ":2,"สัญญาณ Wi-Fi ไปไม่ถึงหรือสัญญาณอ่อน":5,"ไม่สามารถเชื่อมต่อเครือข่ายอินเทอร์เน็ตได้":0},"priority":3}}
+}/*PUBLISHED-DATA-END*/;
+const SEED = PUBLISHED.status;
+const SEED_SURVEY = PUBLISHED.survey && { ...PUBLISHED.survey, rows: [] };
 
 /* ---------- Helpers ---------- */
 const TH_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -404,6 +384,7 @@ function tone(v) {
 const TONE_ORDER = { good: 0, mid: 1, bad: 2, neu: 3 };
 const TONE_BG = { good: 'bg-done', mid: 'bg-prog', bad: 'bg-todo', neu: 'bg-neu' };
 const TONE_CHIP = { good: 'bg-donesoft text-done', mid: 'bg-progsoft text-prog', bad: 'bg-todosoft text-todo', neu: 'bg-neusoft text-muted' };
+const BAD_KNOWN = ['ไม่ครอบคลุม','ไม่มี','ไม่มีสัญญาณ','ใช้ไม่ได้','ไม่ดี','แย่','ต้องปรับปรุง'];
 const isEmptySugg = s => !s || /^(-|ไม่มี|ไม่มีข้อเสนอแนะ|n\/?a)$/i.test(String(s).trim());
 
 function issuesOf(r, questions) {
@@ -529,6 +510,7 @@ function render() {
   $('view-status').hidden = state.tab !== 'status';
   $('view-survey').hidden = state.tab !== 'survey';
   $('resetBtn').hidden = state.source !== 'upload';
+  $('publishBtn').hidden = !(STAFF && state.source === 'upload');
 
   const sa = statusAgg(currentStatusRows());
   renderStatus(sa);
@@ -694,6 +676,41 @@ $('copyBtn').addEventListener('click', () => {
   const done = () => { $('copyLabel').textContent = 'คัดลอกแล้ว'; setTimeout(() => $('copyLabel').textContent = 'คัดลอกข้อความรายงาน', 2000); };
   const fallback = () => { const t = $('copyFallback'); t.value = reportText; t.hidden = false; t.focus(); t.select(); $('copyLabel').textContent = 'เลือกข้อความแล้ว กด Ctrl+C'; };
   try { navigator.clipboard.writeText(reportText).then(done, fallback); } catch (e) { fallback(); }
+});
+
+/* ---------- Build a publishable index.html (staff only) ---------- */
+const MARK_START = '/*PUBLISHED-DATA-' + 'START*/', MARK_END = '/*PUBLISHED-DATA-' + 'END*/';
+const fmtPublished = d => ('{\n"status": [\n' + d.status.map(r => JSON.stringify(r)).join(',\n') + '\n],\n"survey": ' + JSON.stringify(d.survey) + '\n}').replace(/</g, '\\u003c');
+function buildPublished() {
+  const status = currentStatusRows().map(r => ({ round: r.round, code: r.code, name: r.name, sStatus: r.sStatus, dStatus: r.dStatus, last: r.last }));
+  const sv = currentSurvey();
+  if (!sv || !sv.rows.length) return { status, survey: null };
+  // Only known choices are published as typed; anything else (free text) is counted as "อื่นๆ"
+  const known = v => v === '-' || GOOD.includes(v) || MID.includes(v) || BAD_KNOWN.includes(v);
+  const answers = Object.fromEntries(sv.questions.map(q => {
+    const c = {};
+    sv.rows.forEach(r => { const raw = String(r.ans[q] || '-').trim() || '-'; const v = known(raw) ? raw : 'อื่นๆ'; c[v] = (c[v] || 0) + 1; });
+    return [q, c];
+  }));
+  const problems = Object.fromEntries(sv.problems.map(p => [p, sv.rows.filter(r => r.probs.includes(p)).length]));
+  const priority = surveyAgg(sv).schools.filter(r => r.issues.length >= 2).length;
+  return { status, survey: { questions: sv.questions, problems: sv.problems, totals: { n: sv.rows.length, answers, problems, priority } } };
+}
+$('publishBtn').addEventListener('click', async () => {
+  if (!STAFF || state.source !== 'upload') return;
+  let src = null;
+  try { const res = await fetch(location.pathname, { cache: 'no-store' }); if (res.ok) src = await res.text(); } catch (e) {}
+  if (!src) { showNotice('อ่านโค้ดต้นฉบับของหน้าเว็บไม่ได้ โปรดใช้ลิงก์เว็บจริง หรือเปิดผ่าน Live Server (เปิดไฟล์จากเครื่องโดยตรงใช้ปุ่มนี้ไม่ได้)', 'error'); return; }
+  const head = src.split(MARK_START), tail = head.length === 2 ? head[1].split(MARK_END) : [];
+  if (tail.length !== 2) { showNotice('ไม่พบตำแหน่งข้อมูลในโค้ดต้นฉบับ จึงสร้างไฟล์ไม่ได้', 'error'); return; }
+  const data = buildPublished();
+  const out = head[0] + MARK_START + fmtPublished(data) + MARK_END + tail[1];
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([out], { type: 'text/html' }));
+  a.download = 'index.html';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  showNotice(`สร้างไฟล์ index.html แล้ว: สถานะ ${data.status.length} แห่ง · ผลสำรวจ ${data.survey ? data.survey.totals.n : 0} แห่ง (เฉพาะยอดรวม) นำไฟล์นี้ขึ้น GitHub โดยใช้ชื่อ index.html`, 'ok');
 });
 
 /* ---------- Upload ---------- */
